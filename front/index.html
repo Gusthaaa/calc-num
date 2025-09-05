@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora Numérica Visual - Gauss e Bissecção</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #0056b3;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        h2 {
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+            color: #007bff;
+            margin-top: 25px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input[type="text"],
+        .input-group input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .matrix-controls {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .matrix-controls button {
+            flex: 0 1 auto; /* Botões não esticam */
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        .matrix-controls button.add { background-color: #28a745; }
+        .matrix-controls button.add:hover { background-color: #218838; }
+        .matrix-controls button.remove { background-color: #dc3545; }
+        .matrix-controls button.remove:hover { background-color: #c82333; }
+        #results-bissec, #results-gauss {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9f5ff;
+            border-left: 5px solid #007bff;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            display: none;
+        }
+        #bissec-chart-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            height: 350px;
+            position: relative;
+        }
+        #matrix-container {
+            display: grid;
+            gap: 5px;
+            margin-top: 10px;
+        }
+        #matrix-container input {
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Calculadora de Métodos Numéricos Visuais</h1>
+
+    <div class="container">
+        <h2>Método da Bissecção</h2>
+        <div class="input-group">
+            <label for="bissec-func">Função f(x):</label>
+            <input type="text" id="bissec-func" value="x^3 - x - 2" placeholder="Ex: x^3 - 9*x + 3">
+        </div>
+        <div class="input-group">
+            <label for="bissec-a">Início do intervalo (a):</label>
+            <input type="number" id="bissec-a" value="1" step="any">
+        </div>
+        <div class="input-group">
+            <label for="bissec-b">Fim do intervalo (b):</label>
+            <input type="number" id="bissec-b" value="2" step="any">
+        </div>
+        <div class="input-group">
+            <label for="bissec-tol">Tolerância (ε):</label>
+            <input type="number" id="bissec-tol" value="0.0001" step="0.00001">
+        </div>
+        <div class="button-group">
+            <button onclick="iniciarBissec()">Iniciar/Resetar</button>
+            <button id="nextBissecBtn" onclick="proximoPassoBissec()" disabled>Próximo Passo</button>
+            <button id="runAllBissecBtn" onclick="executarTudoBissec()" disabled>Executar Tudo</button>
+        </div>
+        <div id="bissec-chart-container">
+            <canvas id="bissecChart"></canvas>
+        </div>
+        <div id="results-bissec"></div>
+    </div>
+
+    <div class="container">
+        <h2>Eliminação de Gauss</h2>
+        <div class="matrix-controls">
+            <button class="add" onclick="addGaussRow()">+ Adicionar Linha/Coluna</button>
+            <button class="remove" onclick="removeGaussRow()">- Remover Linha/Coluna</button>
+        </div>
+        <p>Insira a matriz aumentada [A|B]:</p>
+        <div id="matrix-container"></div>
+        <br>
+        <button onclick="calcularGauss()">Resolver Sistema</button>
+        <div id="results-gauss"></div>
+    </div>
+
+    <script>
+        // --- Variáveis globais para Bissecção ---
+        let bisseccaoFunction = null;
+        let currentA, currentB, currentTol;
+        let bisseccaoChart = null;
+        let iteracoesBisseccao = [];
+        let chartPoints = [];
+        let iteracaoAtualIndex = -1;
+
+        // --- Variáveis globais e Lógica para Gauss ---
+        let gaussMatrixSize = 3; // Inicia com 3x3
+
+        // Função principal para desenhar a matriz de Gauss
+        function renderGaussMatrix() {
+            const container = document.getElementById('matrix-container');
+            container.innerHTML = '';
+            container.style.gridTemplateColumns = `repeat(${gaussMatrixSize + 1}, 1fr)`;
+
+            for (let i = 0; i < gaussMatrixSize; i++) {
+                for (let j = 0; j < gaussMatrixSize + 1; j++) {
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.id = `gauss_cell_${i}_${j}`;
+                    input.placeholder = `a[${i+1}][${j+1}]`;
+                    container.appendChild(input);
+                }
+            }
+             // Desabilita o botão de remover se a matriz for 2x2
+            document.querySelector('.matrix-controls .remove').disabled = (gaussMatrixSize <= 2);
+        }
+
+        // Funções dos botões de controle da matriz
+        function addGaussRow() {
+            if (gaussMatrixSize < 10) { // Limite máximo de 10x10
+                gaussMatrixSize++;
+                renderGaussMatrix();
+            }
+        }
+
+        function removeGaussRow() {
+            if (gaussMatrixSize > 2) { // Limite mínimo de 2x2
+                gaussMatrixSize--;
+                renderGaussMatrix();
+            }
+        }
+        
+        // Inicializa a matriz de Gauss na carga da página
+        window.onload = function() {
+            renderGaussMatrix();
+        };
+
+        // --- LÓGICA DO MÉTODO DA BISSECÇÃO (INALTERADO) ---
+        function setupBissecChart(func, initialA, initialB) {
+            const ctx = document.getElementById('bissecChart').getContext('2d');
+            if (bisseccaoChart) {
+                bisseccaoChart.destroy();
+            }
+            const plotPoints = [];
+            let xMin = initialA - (initialB - initialA) * 0.2;
+            let xMax = initialB + (initialB - initialA) * 0.2;
+            let step = (xMax - xMin) / 100;
+            for (let x = xMin; x <= xMax; x += step) {
+                try { plotPoints.push({ x: x, y: func(x) }); } catch (e) {}
+            }
+            bisseccaoChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        { label: 'f(x)', data: plotPoints, borderColor: 'blue', borderWidth: 2, pointRadius: 0, showLine: true, fill: false },
+                        { label: 'Intervalo [a, b]', data: [{ x: initialA, y: 0 }, { x: initialB, y: 0 }], borderColor: 'red', borderWidth: 2, pointRadius: 5, backgroundColor: 'red', showLine: true, type: 'line' },
+                        { label: 'Ponto Médio (m)', data: [], borderColor: 'green', backgroundColor: 'green', pointRadius: 7, type: 'scatter' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { type: 'linear', position: 'bottom', title: { display: true, text: 'x' }}, y: { type: 'linear', title: { display: true, text: 'f(x)' }}} }
+            });
+        }
+        function iniciarBissec() {
+            const funcStr = document.getElementById('bissec-func').value;
+            currentA = parseFloat(document.getElementById('bissec-a').value);
+            currentB = parseFloat(document.getElementById('bissec-b').value);
+            currentTol = parseFloat(document.getElementById('bissec-tol').value);
+            const resultsDiv = document.getElementById('results-bissec');
+            resultsDiv.style.display = 'none';
+            resultsDiv.innerHTML = '';
+            document.getElementById('nextBissecBtn').disabled = true;
+            document.getElementById('runAllBissecBtn').disabled = true;
+            if (!funcStr || isNaN(currentA) || isNaN(currentB) || isNaN(currentTol)) {
+                resultsDiv.textContent = "Erro: Preencha todos os campos corretamente.";
+                resultsDiv.style.display = 'block';
+                return;
+            }
+            try {
+                const node = math.parse(funcStr);
+                bisseccaoFunction = x => node.evaluate({x: x});
+            } catch (err) {
+                resultsDiv.textContent = "Erro na função: " + err.message;
+                resultsDiv.style.display = 'block';
+                return;
+            }
+            let fa = bisseccaoFunction(currentA);
+            let fb = bisseccaoFunction(currentB);
+            if (fa * fb >= 0) {
+                resultsDiv.textContent = "Erro: f(a) * f(b) precisa ser < 0. Não há garantia de raiz neste intervalo.";
+                resultsDiv.style.display = 'block';
+                return;
+            }
+            iteracoesBisseccao = [{ a: currentA, b: currentB, fa: fa, fb: fb, m: null, fm: null }];
+            iteracaoAtualIndex = 0;
+            setupBissecChart(bisseccaoFunction, currentA, currentB);
+            updateBissecChart(currentA, currentB, null);
+            document.getElementById('nextBissecBtn').disabled = false;
+            document.getElementById('runAllBissecBtn').disabled = false;
+            resultsDiv.textContent = `Iteração 0: a = ${currentA.toFixed(6)}, b = ${currentB.toFixed(6)}, f(a)=${fa.toExponential(4)}, f(b)=${fb.toExponential(4)}`;
+            resultsDiv.style.display = 'block';
+        }
+        function proximoPassoBissec() {
+            if (!bisseccaoFunction || iteracaoAtualIndex >= 1000) {
+                document.getElementById('nextBissecBtn').disabled = true;
+                document.getElementById('runAllBissecBtn').disabled = true;
+                return;
+            }
+            currentA = iteracoesBisseccao[iteracaoAtualIndex].a;
+            currentB = iteracoesBisseccao[iteracaoAtualIndex].b;
+            if ((currentB - currentA) / 2 <= currentTol) {
+                document.getElementById('results-bissec').innerHTML += `\n\n<strong>Convergiu!</strong> Raiz aproximada: ${((currentA + currentB) / 2).toFixed(6)} em ${iteracaoAtualIndex} iterações.`;
+                document.getElementById('nextBissecBtn').disabled = true;
+                document.getElementById('runAllBissecBtn').disabled = true;
+                return;
+            }
+            const m = (currentA + currentB) / 2;
+            const fm = bisseccaoFunction(m);
+            let nextA = currentA;
+            let nextB = currentB;
+            let nextFa = bisseccaoFunction(nextA);
+            if (fm === 0) {
+                nextA = m; nextB = m;
+            } else if (bisseccaoFunction(currentA) * fm < 0) {
+                nextB = m;
+            } else {
+                nextA = m; nextFa = fm;
+            }
+            iteracoesBisseccao.push({ a: nextA, b: nextB, fa: nextFa, fb: bisseccaoFunction(nextB), m: m, fm: fm });
+            iteracaoAtualIndex++;
+            updateBissecChart(currentA, currentB, m);
+            document.getElementById('results-bissec').innerHTML += `\nIteração ${iteracaoAtualIndex}: a = ${currentA.toFixed(6)}, b = ${currentB.toFixed(6)}, m = ${m.toFixed(6)}, f(m)=${fm.toExponential(4)}`;
+            if ((nextB - nextA) / 2 <= currentTol || fm === 0) {
+                document.getElementById('results-bissec').innerHTML += `\n\n<strong>Convergiu!</strong> Raiz aproximada: ${((nextA + nextB) / 2).toFixed(6)} em ${iteracaoAtualIndex} iterações.`;
+                document.getElementById('nextBissecBtn').disabled = true;
+                document.getElementById('runAllBissecBtn').disabled = true;
+            }
+        }
+        function executarTudoBissec() {
+            document.getElementById('nextBissecBtn').disabled = true;
+            document.getElementById('runAllBissecBtn').disabled = true;
+            while (iteracaoAtualIndex < 1000 && !document.getElementById('nextBissecBtn').disabled) {
+                proximoPassoBissec();
+            }
+        }
+        function updateBissecChart(a, b, m) {
+            bisseccaoChart.data.datasets[1].data = [{ x: a, y: 0 }, { x: b, y: 0 }];
+            bisseccaoChart.data.datasets[2].data = m !== null ? [{ x: m, y: bisseccaoFunction(m) }] : [];
+            bisseccaoChart.update();
+        }
+
+        // --- LÓGICA DA ELIMINAÇÃO DE GAUSS (ATUALIZADA) ---
+        function calcularGauss() {
+            const size = gaussMatrixSize; // USA A VARIÁVEL GLOBAL
+            const matrix = [];
+            const resultsDiv = document.getElementById('results-gauss');
+            resultsDiv.style.display = 'none';
+            resultsDiv.innerHTML = '';
+            for (let i = 0; i < size; i++) {
+                matrix[i] = [];
+                for (let j = 0; j < size + 1; j++) {
+                    const val = parseFloat(document.getElementById(`gauss_cell_${i}_${j}`).value);
+                    if (isNaN(val)) {
+                        resultsDiv.textContent = `Erro: Valor inválido na célula [${i+1}][${j+1}].`;
+                        resultsDiv.style.display = 'block';
+                        return;
+                    }
+                    matrix[i][j] = val;
+                }
+            }
+            let resultText = "<strong>Matriz Original:</strong>\n" + formatMatrix(matrix, size) + "\n\n";
+            for (let i = 0; i < size; i++) {
+                let maxRow = i;
+                for (let k = i + 1; k < size; k++) {
+                    if (Math.abs(matrix[k][i]) > Math.abs(matrix[maxRow][i])) {
+                        maxRow = k;
+                    }
+                }
+                if (maxRow !== i) {
+                    [matrix[i], matrix[maxRow]] = [matrix[maxRow], matrix[i]];
+                    resultText += `<strong>Troca de Linhas (pivoteamento): L${i+1} <-> L${maxRow+1}</strong>\n` + formatMatrix(matrix, size) + "\n\n";
+                }
+                if (matrix[i][i] === 0) {
+                    resultsDiv.textContent = "Erro: Pivô zero encontrado. O sistema pode não ter solução única.";
+                    resultsDiv.style.display = 'block';
+                    return;
+                }
+                for (let k = i + 1; k < size; k++) {
+                    const factor = matrix[k][i] / matrix[i][i];
+                    for (let j = i; j < size + 1; j++) {
+                        matrix[k][j] -= factor * matrix[i][j];
+                    }
+                    resultText += `<strong>Operação: L${k+1} = L${k+1} - (${factor.toFixed(4)})*L${i+1}</strong>\n` + formatMatrix(matrix, size) + "\n\n";
+                }
+            }
+            resultText += "<strong>Matriz Triangular Superior Final:</strong>\n" + formatMatrix(matrix, size) + "\n\n";
+            const solution = new Array(size);
+            for (let i = size - 1; i >= 0; i--) {
+                let sum = 0;
+                for (let j = i + 1; j < size; j++) {
+                    sum += matrix[i][j] * solution[j];
+                }
+                solution[i] = (matrix[i][size] - sum) / matrix[i][i];
+            }
+            resultText += "<strong>Solução encontrada (x):</strong>\n\n";
+            solution.forEach((val, index) => {
+                resultText += `x${index + 1} = ${val.toFixed(6)}\n`;
+            });
+            resultsDiv.innerHTML = resultText;
+            resultsDiv.style.display = 'block';
+        }
+        function formatMatrix(mat, size) {
+            let str = '';
+            for (let i = 0; i < size; i++) {
+                str += '[';
+                for (let j = 0; j < size; j++) {
+                    str += mat[i][j].toFixed(4).padStart(10) + (j < size - 1 ? ' ' : '');
+                }
+                str += ' | ' + mat[i][size].toFixed(4).padStart(10) + ']\n';
+            }
+            return str;
+        }
+
+    </script>
+</body>
+</html>
