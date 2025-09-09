@@ -137,14 +137,6 @@
             <input type="text" id="bissec-func" value="x^3 - x - 2" placeholder="Ex: x^3 - 9*x + 3">
         </div>
         <div class="input-group">
-            <label for="bissec-a">Início do intervalo (a):</label>
-            <input type="number" id="bissec-a" value="1" step="any">
-        </div>
-        <div class="input-group">
-            <label for="bissec-b">Fim do intervalo (b):</label>
-            <input type="number" id="bissec-b" value="2" step="any">
-        </div>
-        <div class="input-group">
             <label for="bissec-tol">Tolerância (ε):</label>
             <input type="number" id="bissec-tol" value="0.0001" step="0.00001">
         </div>
@@ -250,15 +242,15 @@
         }
         function iniciarBissec() {
             const funcStr = document.getElementById('bissec-func').value;
-            currentA = parseFloat(document.getElementById('bissec-a').value);
-            currentB = parseFloat(document.getElementById('bissec-b').value);
+            currentA = -1000;
+            currentB = 1000;
             currentTol = parseFloat(document.getElementById('bissec-tol').value);
             const resultsDiv = document.getElementById('results-bissec');
             resultsDiv.style.display = 'none';
             resultsDiv.innerHTML = '';
             document.getElementById('nextBissecBtn').disabled = true;
             document.getElementById('runAllBissecBtn').disabled = true;
-            if (!funcStr || isNaN(currentA) || isNaN(currentB) || isNaN(currentTol)) {
+            if (!funcStr || isNaN(currentTol)) {
                 resultsDiv.textContent = "Erro: Preencha todos os campos corretamente.";
                 resultsDiv.style.display = 'block';
                 return;
@@ -273,10 +265,33 @@
             }
             let fa = bisseccaoFunction(currentA);
             let fb = bisseccaoFunction(currentB);
+
+            // Tenta encontrar um subintervalo dentro de [-1000, 1000] onde f(a) e f(b) tenham sinais opostos
             if (fa * fb >= 0) {
-                resultsDiv.textContent = "Erro: f(a) * f(b) precisa ser < 0. Não há garantia de raiz neste intervalo.";
-                resultsDiv.style.display = 'block';
-                return;
+                let foundInterval = false;
+                const step = 10;
+                for (let i = currentA; i < currentB; i += step) {
+                    let tempA = i;
+                    let tempB = i + step;
+                    if (tempB > currentB) tempB = currentB;
+
+                    let tempFa = bisseccaoFunction(tempA);
+                    let tempFb = bisseccaoFunction(tempB);
+
+                    if (tempFa * tempFb < 0) {
+                        currentA = tempA;
+                        currentB = tempB;
+                        fa = tempFa;
+                        fb = tempFb;
+                        foundInterval = true;
+                        break;
+                    }
+                }
+                if (!foundInterval) {
+                    resultsDiv.textContent = "Erro: Não foi possível encontrar um intervalo [a, b] dentro de [-1000, 1000] onde f(a) * f(b) < 0. Tente uma função diferente ou um intervalo maior.";
+                    resultsDiv.style.display = 'block';
+                    return;
+                }
             }
             iteracoesBisseccao = [{ a: currentA, b: currentB, fa: fa, fb: fb, m: null, fm: null }];
             iteracaoAtualIndex = 0;
@@ -336,9 +351,9 @@
             bisseccaoChart.update();
         }
 
-        // --- LÓGICA DA ELIMINAÇÃO DE GAUSS (ATUALIZADA) ---
+      
         function calcularGauss() {
-            const size = gaussMatrixSize; // USA A VARIÁVEL GLOBAL
+            const size = gaussMatrixSize;
             const matrix = [];
             const resultsDiv = document.getElementById('results-gauss');
             resultsDiv.style.display = 'none';
@@ -396,14 +411,15 @@
             resultsDiv.innerHTML = resultText;
             resultsDiv.style.display = 'block';
         }
+
         function formatMatrix(mat, size) {
-            let str = '';
+            let str = "";
             for (let i = 0; i < size; i++) {
-                str += '[';
+                str += "[";
                 for (let j = 0; j < size; j++) {
-                    str += mat[i][j].toFixed(4).padStart(10) + (j < size - 1 ? ' ' : '');
+                    str += mat[i][j].toFixed(4).padStart(10) + (j < size - 1 ? ", " : "");
                 }
-                str += ' | ' + mat[i][size].toFixed(4).padStart(10) + ']\n';
+                str += " | " + mat[i][size].toFixed(4).padStart(10) + "]\n";
             }
             return str;
         }
@@ -411,3 +427,5 @@
     </script>
 </body>
 </html>
+
+
