@@ -191,7 +191,7 @@
                     container.appendChild(input);
                 }
             }
-             // Desabilita o botão de remover se a matriz for 2x2
+            // Desabilita o botão de remover se a matriz for 2x2
             document.querySelector('.matrix-controls .remove').disabled = (gaussMatrixSize <= 2);
         }
 
@@ -269,11 +269,11 @@
             // Tenta encontrar um subintervalo dentro de [-1000, 1000] onde f(a) e f(b) tenham sinais opostos
             if (fa * fb >= 0) {
                 let foundInterval = false;
-                const step = 10;
+                const step = 10; // Pode ajustar o passo conforme a necessidade
                 for (let i = currentA; i < currentB; i += step) {
                     let tempA = i;
                     let tempB = i + step;
-                    if (tempB > currentB) tempB = currentB;
+                    if (tempB > currentB) tempB = currentB; // Garante que não ultrapasse o limite superior
 
                     let tempFa = bisseccaoFunction(tempA);
                     let tempFb = bisseccaoFunction(tempB);
@@ -318,17 +318,19 @@
             }
             const m = (currentA + currentB) / 2;
             const fm = bisseccaoFunction(m);
-            let nextA = currentA;
-            let nextB = currentB;
-            let nextFa = bisseccaoFunction(nextA);
+            let nextA;
+            let nextB;
             if (fm === 0) {
-                nextA = m; nextB = m;
-            } else if (bisseccaoFunction(currentA) * fm < 0) {
+                nextA = m; 
                 nextB = m;
-            } else {
-                nextA = m; nextFa = fm;
+            } else if (bisseccaoFunction(currentA) * fm < 0) { // Se f(a) e f(m) têm sinais opostos, a raiz está em [a, m]
+                nextA = currentA;
+                nextB = m;
+            } else { // Se f(b) e f(m) têm sinais opostos, a raiz está em [m, b]
+                nextA = m;
+                nextB = currentB;
             }
-            iteracoesBisseccao.push({ a: nextA, b: nextB, fa: nextFa, fb: bisseccaoFunction(nextB), m: m, fm: fm });
+            iteracoesBisseccao.push({ a: nextA, b: nextB, fa: bisseccaoFunction(nextA), fb: bisseccaoFunction(nextB), m: m, fm: fm });
             iteracaoAtualIndex++;
             updateBissecChart(currentA, currentB, m);
             document.getElementById('results-bissec').innerHTML += `\nIteração ${iteracaoAtualIndex}: a = ${currentA.toFixed(6)}, b = ${currentB.toFixed(6)}, m = ${m.toFixed(6)}, f(m)=${fm.toExponential(4)}`;
@@ -351,7 +353,7 @@
             bisseccaoChart.update();
         }
 
-      
+        // --- LÓGICA DA ELIMINAÇÃO DE GAUSS (ATUALIZADA) ---
         function calcularGauss() {
             const size = gaussMatrixSize;
             const matrix = [];
@@ -370,7 +372,15 @@
                     matrix[i][j] = val;
                 }
             }
+            
+            // --- INÍCIO DAS MODIFICAÇÕES ---
+            const L = Array(size).fill(0).map(() => Array(size).fill(0));
+            for(let i = 0; i < size; i++) L[i][i] = 1;
+            let swapCount = 0;
+            // --- FIM DAS MODIFICAÇÕES ---
+
             let resultText = "<strong>Matriz Original:</strong>\n" + formatMatrix(matrix, size) + "\n\n";
+            
             for (let i = 0; i < size; i++) {
                 let maxRow = i;
                 for (let k = i + 1; k < size; k++) {
@@ -379,23 +389,46 @@
                     }
                 }
                 if (maxRow !== i) {
+                    swapCount++; // CONTA A TROCA DE LINHAS
                     [matrix[i], matrix[maxRow]] = [matrix[maxRow], matrix[i]];
                     resultText += `<strong>Troca de Linhas (pivoteamento): L${i+1} <-> L${maxRow+1}</strong>\n` + formatMatrix(matrix, size) + "\n\n";
                 }
                 if (matrix[i][i] === 0) {
-                    resultsDiv.textContent = "Erro: Pivô zero encontrado. O sistema pode não ter solução única.";
+                    resultsDiv.textContent = "Erro: Pivô zero encontrado. O sistema pode não ter solução única (Determinante é zero).";
                     resultsDiv.style.display = 'block';
                     return;
                 }
                 for (let k = i + 1; k < size; k++) {
                     const factor = matrix[k][i] / matrix[i][i];
+                    L[k][i] = factor; // ARMAZENA O FATOR NA MATRIZ L
                     for (let j = i; j < size + 1; j++) {
                         matrix[k][j] -= factor * matrix[i][j];
                     }
                     resultText += `<strong>Operação: L${k+1} = L${k+1} - (${factor.toFixed(4)})*L${i+1}</strong>\n` + formatMatrix(matrix, size) + "\n\n";
                 }
             }
-            resultText += "<strong>Matriz Triangular Superior Final:</strong>\n" + formatMatrix(matrix, size) + "\n\n";
+
+            // --- INÍCIO DAS MODIFICAÇÕES PARA EXIBIÇÃO ---
+            const U = Array(size).fill(0).map((_, r) =>
+                Array(size).fill(0).map((__, c) => (r <= c ? matrix[r][c] : 0))
+            );
+
+            let det = Math.pow(-1, swapCount);
+            for (let i = 0; i < size; i++) {
+                det *= U[i][i];
+            }
+
+            resultText += "<strong>--- Fatoração LU e Determinante ---</strong>\n\n";
+            resultText += formatSquareMatrix(L, size, "L");
+            resultText += "\n";
+            resultText += formatSquareMatrix(U, size, "U");
+            resultText += "\n";
+            resultText += `<strong>Determinante de A (det(U) * (-1)^trocas):</strong> ${det.toFixed(6)}\n\n`;
+            resultText += "<strong>--- Resolução do Sistema ---</strong>\n\n";
+            // --- FIM DAS MODIFICAÇÕES PARA EXIBIÇÃO ---
+
+            resultText += "<strong>Matriz Aumentada Triangularizada Final:</strong>\n" + formatMatrix(matrix, size) + "\n\n";
+            
             const solution = new Array(size);
             for (let i = size - 1; i >= 0; i--) {
                 let sum = 0;
@@ -424,8 +457,19 @@
             return str;
         }
 
+        // --- NOVA FUNÇÃO ADICIONADA ---
+        function formatSquareMatrix(mat, size, name) {
+            let str = `<strong>Matriz ${name}:</strong>\n`;
+            for (let i = 0; i < size; i++) {
+                str += "[";
+                for (let j = 0; j < size; j++) {
+                    str += mat[i][j].toFixed(4).padStart(10) + (j < size - 1 ? ", " : "");
+                }
+                str += "]\n";
+            }
+            return str;
+        }
+
     </script>
 </body>
 </html>
-
-
